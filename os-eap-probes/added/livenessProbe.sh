@@ -17,21 +17,30 @@ SLEEP=5
 DEBUG_SCRIPT=false
 PROBE_IMPL=probe.eap.dmr.EapProbe
 
-if [ $# -gt 0 ] ; then
-    COUNT=$1
-fi
+counter=0
+for arg in "$@"
+do
+    if [ $counter -eq 0 ] ; then
+        COUNT=$arg
+    fi
 
-if [ $# -gt 1 ] ; then
-    SLEEP=$2
-fi
+    if [ $counter -eq 1 ] ; then
+        SLEEP=$arg
+    fi
 
-if [ $# -gt 2 ] ; then
-    DEBUG_SCRIPT=$3
-fi
+    if [ $counter -eq 2 ] ; then
+        DEBUG_SCRIPT=$arg
+    fi
 
-if [ $# -gt 3 ] ; then
-    PROBE_IMPL=$4
-fi
+    if [ $counter -eq 3 ] ; then
+        PROBE_IMPL=$arg
+    fi
+
+    if [ $counter -gt 3 ] ; then
+        PROBE_IMPL="$PROBE_IMPL $arg"
+    fi
+    ((counter++))
+done
 
 # Sleep for 5 seconds to avoid launching readiness and liveness probes
 # at the same time
