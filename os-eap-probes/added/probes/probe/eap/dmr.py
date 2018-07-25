@@ -30,7 +30,8 @@ class EapProbe(DmrProbe):
             [
                 ServerStatusTest(),
                 BootErrorsTest(),
-                DeploymentTest()
+                DeploymentTest(),
+                HealthCheckTest()
             ]
         )
 
@@ -145,4 +146,67 @@ class DeploymentTest(Test):
                     status.add(Status.FAILURE)
 
         return (min(status), messages)
+
+class HealthCheckTest(Test):
+    """
+    Checks the state of the Health Check subsystem, if installed.
+    We use a composite with a first step that does a simple read-resource
+    and a second step that reads the health check status.
+    A failure in the first step means the subsystem is not present and any
+    failure in the second step should be ignored as meaningless.
+    """
+
+    def __init__(self):
+        super(HealthCheckTest, self).__init__(
+            {
+                "operation": "composite",
+                "address": [],
+                "steps": [
+                    {
+                        "operation": "read-resource",
+                        "address": {
+                            "subsystem": "microprofile-health-smallrye"
+                        },
+                        "recursive" : False
+                    },
+                    {
+                        "operation": "check",
+                        "address": {
+                            "subsystem": "microprofile-health-smallrye"
+                        }
+					}
+				]
+            }
+        )
+
+    def evaluate(self, results):
+        """
+        Evaluates the test:
+            if the 'read-resource' step failed:
+                READY as failure means no health check configured on the system
+            elsif the 'check' step succeeded:
+                READY if the 'check' step result's status field is 'UP'
+                FAILURE if the 'check' step result's status field is 'DOWN'
+            else:
+                FAILURE as the query failed
+
+        In no case do we return NOT_READY as MicroProfile Health Check is not a readiness check.
+        """
+
+        if not results["result"]:
+            return (Status.FAILURE, "DMR query failed")
+
+        if results["result"]["step-1"]["outcome"] != "success":
+            return (Status.READY, "Health Check not configured")
+
+        if results["result"]["step-2"]["outcome"] != "success":
+            return (Status.FAILURE, "DMR query failed")
+
+        if not results["result"]["step-2"]["result"]:
+            return (Status.FAILURE, "DMR query failed")
+
+        if results["result"]["step-2"]["result"]["status"] == "UP":
+            return (Status.READY, "Status UP")
+
+        return (Status.FAILURE, str(results["result"]["step-2"]["result"]))
 
