@@ -22,9 +22,10 @@ import sys
 
 from collections import OrderedDict
 
+from probe import HttpManagementProbe
 from probe.api import qualifiedClassName, BatchingProbe, Status, Test
 
-class DmrProbe(BatchingProbe):
+class DmrProbe(HttpManagementProbe):
     """
     A Probe implementation that sends a batch of queries to a server using EAP's
     management interface.  Tests should provide JSON queries specific to EAP's
@@ -33,26 +34,6 @@ class DmrProbe(BatchingProbe):
 
     def __init__(self, tests = []):
         super(DmrProbe, self).__init__(tests)
-        self.logger = logging.getLogger(qualifiedClassName(self))
-        self.__readConfig()
-        
-    def __readConfig(self):
-        """
-        Configuration consists of:
-            host: localhost
-            port: 9990 + $PORT_OFFSET
-            user: $ADMIN_USERNAME
-            password: $ADMIN_PASSWORD
-        """
-        
-        self.host = "localhost"
-        self.port = 9990 + int(os.getenv('PORT_OFFSET', 0))
-        self.user = os.getenv('ADMIN_USERNAME')
-        self.password = os.getenv('ADMIN_PASSWORD')
-        if self.password != "":
-          if self.user is None or self.user == "":
-            self.user = os.getenv('DEFAULT_ADMIN_USERNAME')
-        self.logger.debug("Configuration set as follows: host=%s, port=%s, user=%s, password=***", self.host, self.port, self.user)
 
     def getTestInput(self, results, testIndex):
         return results["result"].values()[testIndex]
@@ -69,24 +50,7 @@ class DmrProbe(BatchingProbe):
                 }
 
     def sendRequest(self, request):
-        url = "http://%s:%s/management" % (self.host, self.port)
-        self.logger.info("Sending probe request to %s", url)
-        if self.logger.isEnabledFor(logging.DEBUG):
-            self.logger.debug("Probe request = %s", json.dumps(request, indent=4, separators=(',', ': ')))
-        response = requests.post(
-            url,
-            json = request,
-            headers = {
-                "Accept": "text/plain"
-            },
-            proxies = {
-                "http": None,
-                "https": None
-            },
-            auth = requests.auth.HTTPDigestAuth(self.user, self.password) if self.user else None,
-            verify = False
-        )
-        self.logger.debug("Probe response: %s", response)
+        response = sendRequest(self, "management", request)
 
         if response.status_code != 200:
             self.logger.error("Probe request failed.  Status code: %s", response.status_code)
