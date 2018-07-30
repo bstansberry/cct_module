@@ -56,7 +56,7 @@ class ServerStatusTest(Test):
             NOT_READY for all other states 
         """
 
-        if results["outcome"] != "success":
+        if results["outcome"] != "success" and results.get("failure-description"):
             return (Status.FAILURE, "DMR query failed")
         if results["result"] == "running":
             return (Status.READY, results["result"])
@@ -89,10 +89,10 @@ class BootErrorsTest(Test):
         if self.__disableBootErrorsCheck:
             return (Status.READY, "Boot errors check is disabled")
 
-        if results["outcome"] != "success":
+        if results["outcome"] != "success" and results.get("failure-description"):
             return (Status.FAILURE, "DMR query failed")
 
-        if results["result"]:
+        if results.get("result"):
             errors = []
             errors.extend(results["result"])
             return (Status.HARD_FAILURE, errors)
@@ -123,7 +123,7 @@ class DeploymentTest(Test):
             FAILURE if the query failed or if any deployments are not OK, but not FAILED
         """
 
-        if results["outcome"] != "success":
+        if results["outcome"] != "success" and results.get("failure-description"):
             return (Status.FAILURE, "DMR query failed")
 
         if not results["result"]:
@@ -132,7 +132,7 @@ class DeploymentTest(Test):
         status = set()
         messages = {}
         for result in results["result"]:
-            if result["outcome"] != "success":
+            if result["outcome"] != "success" and result.get("failure-description"):
                 status.add(Status.FAILURE)
                 messages[result["address"][0]["deployment"]] = "DMR query failed"
             else:
@@ -193,13 +193,13 @@ class HealthCheckTest(Test):
         In no case do we return NOT_READY as MicroProfile Health Check is not a readiness check.
         """
 
-        if not results["result"]:
+        if not results.get("result") or not results["result"].get("step-1"):
             return (Status.FAILURE, "DMR query failed")
 
-        if results["result"]["step-1"]["outcome"] != "success":
+        if results["result"]["step-1"]["outcome"] != "success"  and results["result"]["step-1"]["failure-description"]:
             return (Status.READY, "Health Check not configured")
 
-        if results["result"]["step-2"]["outcome"] != "success":
+        if not results["result"].get("step-2") or results["result"]["step-2"]["outcome"] != "success":
             return (Status.FAILURE, "DMR query failed")
 
         if not results["result"]["step-2"]["result"]:
